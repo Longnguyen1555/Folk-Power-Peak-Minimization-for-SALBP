@@ -1,0 +1,10 @@
+# Core dependencies for SAT/MaxSAT/PB-based solvers
+python-sat>=1.8.dev0
+
+# Dependency for CP-SAT solver
+ortools>=9.6
+
+# Optional dependencies for ILP solvers (commercial/academic licenses may be required)
+# gurobipy>=10.0
+# cplex>=22.1
+# pyscipopt>=4.0
