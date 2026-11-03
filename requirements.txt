@@ -1,5 +1,6 @@
 # Core dependencies for SAT/MaxSAT/PB-based solvers
-python-sat>=1.8.dev0
+# Keep the PBLib-based PBEnc API used by the original encodings.
+python-sat[pblib]>=1.8.dev0,<1.9.dev0
 
 # Dependency for CP-SAT solver
 ortools>=9.6

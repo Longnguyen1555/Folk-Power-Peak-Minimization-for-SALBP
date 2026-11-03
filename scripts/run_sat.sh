@@ -6,6 +6,10 @@
 # solver options: cadical-str, cadical-bs-e, cadical-bs-i, cadical-su-e,
 #                 cadical-su-i, maplesat-str, maplesat-bs-e, maplesat-bs-i,
 #                 maplesat-su-e, maplesat-su-i
+#                 cadical-multiple-e, cadical-multiple-i,
+#                 cadical-incremental-e, cadical-incremental-i,
+#                 maplesat-multiple-e, maplesat-multiple-i,
+#                 maplesat-incremental-e, maplesat-incremental-i
 # If no solver is specified, all SAT-based solvers will be run.
 # =============================================================================
 
@@ -23,6 +27,8 @@ if [ -z "$INSTANCE" ]; then
     echo "Available solvers:"
     echo "  cadical-str, cadical-bs-e, cadical-bs-i, cadical-su-e, cadical-su-i"
     echo "  maplesat-str, maplesat-bs-e, maplesat-bs-i, maplesat-su-e, maplesat-su-i"
+    echo "  cadical-multiple-e, cadical-multiple-i, cadical-incremental-e, cadical-incremental-i"
+    echo "  maplesat-multiple-e, maplesat-multiple-i, maplesat-incremental-e, maplesat-incremental-i"
     exit 1
 fi
 
@@ -59,10 +65,20 @@ else
         maplesat-bs-i)  run_solver "$SOLVER_DIR/Maplesat-BS-I.py" ;;
         maplesat-su-e)  run_solver "$SOLVER_DIR/Maplesat-SU-E.py" ;;
         maplesat-su-i)  run_solver "$SOLVER_DIR/Maplesat-SU-I.py" ;;
+        cadical-multiple-e)    run_solver "$SOLVER_DIR/Cadical-Multiple-E.py" ;;
+        cadical-multiple-i)    run_solver "$SOLVER_DIR/Cadical-Multiple-I.py" ;;
+        cadical-incremental-e) run_solver "$SOLVER_DIR/Cadical-Incremental-E.py" ;;
+        cadical-incremental-i) run_solver "$SOLVER_DIR/Cadical-Incremental-I.py" ;;
+        maplesat-multiple-e)    run_solver "$SOLVER_DIR/Maplesat-Multiple-E.py" ;;
+        maplesat-multiple-i)    run_solver "$SOLVER_DIR/Maplesat-Multiple-I.py" ;;
+        maplesat-incremental-e) run_solver "$SOLVER_DIR/Maplesat-Incremental-E.py" ;;
+        maplesat-incremental-i) run_solver "$SOLVER_DIR/Maplesat-Incremental-I.py" ;;
         *)
             echo "Unknown solver: $SOLVER"
             echo "Available: cadical-str, cadical-bs-e, cadical-bs-i, cadical-su-e, cadical-su-i"
             echo "           maplesat-str, maplesat-bs-e, maplesat-bs-i, maplesat-su-e, maplesat-su-i"
+            echo "           cadical-multiple-e, cadical-multiple-i, cadical-incremental-e, cadical-incremental-i"
+            echo "           maplesat-multiple-e, maplesat-multiple-i, maplesat-incremental-e, maplesat-incremental-i"
             exit 1
             ;;
     esac
