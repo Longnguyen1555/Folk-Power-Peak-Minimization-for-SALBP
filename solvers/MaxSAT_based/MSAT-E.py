@@ -1,3 +1,14 @@
+# Explicit --solve invokes the new RC2 runner. No flags: generate original WCNF.
+import sys as _enh_sys
+from pathlib import Path as _enh_Path
+_enh_sys.path.insert(0, str(_enh_Path(__file__).resolve().parents[2]))
+from salb3pm.compat import execute as _enh_execute
+if "--solve" in _enh_sys.argv[1:]:
+    _enh_args = [x for x in _enh_sys.argv[1:] if x != "--solve"]
+    # Original syntax had an output .wcnf positional argument; not used in solve mode.
+    _enh_args = [x for x in _enh_args if not x.endswith(".wcnf")]
+    raise SystemExit(_enh_execute("maxsat", _enh_args))
+
 from pysat.formula import *
 from pysat.pb import *
 from pysat.solvers import *
@@ -363,3 +374,7 @@ if __name__ == '__main__':
     print(f"### nb_var {wcnf.nv} nb_cons {len(wcnf.hard)+len(wcnf.soft)}")
     # Write to WCNF file for MaxSAT solvers
     wcnf.to_file(output_path)
+# Report this invariant even when the original WCNF is only generated.
+if __name__ == "__main__":
+    print(f"### TotalEnergy {sum(T[j]*W[j] for j in range(1,n+1))} "
+          f"TotalTaskPower {sum(W[1:])}")

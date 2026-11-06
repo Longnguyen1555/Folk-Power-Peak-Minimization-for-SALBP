@@ -1,3 +1,11 @@
+# Direct .3pm builder (new) and legacy .lp reader (preserved).
+import sys as _enh_sys
+from pathlib import Path as _enh_Path
+_enh_sys.path.insert(0, str(_enh_Path(__file__).resolve().parents[2]))
+from salb3pm.compat import enhanced_requested as _enh_requested, execute as _enh_execute
+if _enh_requested(_enh_sys.argv[1:], extension=".3pm"):
+    raise SystemExit(_enh_execute("gurobi", _enh_sys.argv[1:]))
+
 import time
 import sys
 import os
@@ -64,15 +72,16 @@ if __name__ == '__main__':
 
     end_time = time.process_time()
 
-    if model.status == GRB.OPTIMAL:
+    if model.SolCount:
         print("Solution is feasible.")
     else:
-        print("Solution is infeasible or problem is unbounded.")
+        print("No feasible incumbent was returned.")
 
     print("\n---------------------")
     print(f"@@@ {status_map[model.status]}")
     # Output results-old: optimal objective value (minimum power peak)
-    print(f">>> Benchmark {os.path.basename(args.input_path)} OPT {int(model.objVal)}"
+    objective_text = str(int(round(model.ObjVal))) if model.SolCount else "NA"
+    print(f">>> Benchmark {os.path.basename(args.input_path)} OPT {objective_text}"
           f" TimeCost {end_time - start_time} TimeRead {read_end_time - start_time}")
     # To print variable values, uncomment the following line:
     # print(f"### {[v.x for v in model.getVars()]}")

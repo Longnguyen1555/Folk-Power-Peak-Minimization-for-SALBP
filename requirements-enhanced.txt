@@ -1,0 +1,4 @@
+# Full performance tests: pip install -r requirements.txt
+# Optional Gurobi direct .3pm solver requires licensed gurobipy:
+# gurobipy>=10.0
+pytest>=7.0

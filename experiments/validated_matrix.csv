@@ -1,0 +1,9 @@
+instance,method,encoding,objective,repeat,status,wall_time_s,solve_time_s,peak,total_energy,station_peak_sum,variables,clauses,iterations,solver_instances,backend,proof,message
+paper_py_2024.3pm,multiple_sat,pairwise,peak,1,OPTIMAL,1.424405,0.019369,10,46,12,43,279,3,3,pure-dpll:fallback,UNSAT after strict objective tightening,
+paper_py_2024.3pm,multiple_sat,staircase,peak,1,OPTIMAL,1.169637,0.003558,10,46,12,35,193,3,3,pure-dpll:fallback,UNSAT after strict objective tightening,
+paper_py_2024.3pm,incremental_sat,pairwise,peak,1,OPTIMAL,1.093297,0.014535,10,46,12,43,279,3,1,pure-dpll:fallback,UNSAT after strict objective tightening,
+paper_py_2024.3pm,incremental_sat,staircase,peak,1,OPTIMAL,1.057765,0.002378,10,46,12,35,193,3,1,pure-dpll:fallback,UNSAT after strict objective tightening,
+paper_py_2024.3pm,binary_sat,pairwise,peak,1,OPTIMAL,1.114274,0.020877,10,46,12,43,274,4,4,pure-dpll:fallback,Binary SAT bounds converge; UNSAT cuts and feasible incumbent,
+paper_py_2024.3pm,binary_sat,staircase,peak,1,OPTIMAL,1.636613,0.003817,10,46,12,35,188,4,4,pure-dpll:fallback,Binary SAT bounds converge; UNSAT cuts and feasible incumbent,
+paper_py_2024.3pm,paper_cuts,pairwise,peak,1,OPTIMAL,1.283526,0.013645,10,46,12,43,264,3,1,pure-dpll:fallback,UNSAT after strict objective tightening,
+paper_py_2024.3pm,paper_cuts,staircase,peak,1,OPTIMAL,1.238711,0.003392,10,46,12,35,178,3,1,pure-dpll:fallback,UNSAT after strict objective tightening,

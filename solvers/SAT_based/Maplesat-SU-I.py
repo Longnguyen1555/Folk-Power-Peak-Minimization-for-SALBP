@@ -1,3 +1,12 @@
+# Enhanced entry point: executes before legacy imports when explicitly requested.
+# Default command-line behavior of this original file remains unchanged.
+import sys as _enh_sys
+from pathlib import Path as _enh_Path
+_enh_sys.path.insert(0, str(_enh_Path(__file__).resolve().parents[2]))
+from salb3pm.compat import enhanced_requested as _enh_requested, execute as _enh_execute
+if _enh_requested(_enh_sys.argv[1:]):
+    raise SystemExit(_enh_execute('multiple_sat', _enh_sys.argv[1:], 'maplesat'))
+
 """
 SAT-based solver for SALB3PM using SAT-UNSAT search with Inaugural formulation (SAT-SU-I).
 Uses Maplesat solver (corresponds to Cadical-SU-I.py with different SAT solver).
@@ -504,3 +513,7 @@ if __name__ == '__main__':
 
     end_time = time.time()
     print(f"### Benchmark {os.path.basename(input_file)} OPT {MinW} TotTime {end_time - start_time} RealTime {end_time - solve_start_time}")
+# Report the schedule-invariant discrete energy for legacy baseline runs.
+if __name__ == "__main__":
+    print(f"### TotalEnergy {sum(T[j]*W[j] for j in range(1,n+1))} "
+          f"TotalTaskPower {sum(W[1:])}")

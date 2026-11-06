@@ -487,6 +487,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="python this.py <path/to/3pm> <path/to/wcnf_old>")
     parser.add_argument("input_path", help="path/to/3pm")
     parser.add_argument("output_path", help="path/to/wcnf_old")
+    parser.add_argument("--objective", choices=("peak", "total_power", "total_energy", "peak_then_total_power", "peak_then_total_energy"), default="peak",
+                        help="total_power/total_energy are constant for a fixed SALB3PM instance")
     args = parser.parse_args()
     input_file = args.input_path
     output_path = args.output_path
@@ -509,4 +511,15 @@ if __name__ == '__main__':
     solve_start_time = time.time()
     print(f"$$$ TimeEncoding: {solve_start_time - start_time}")
     # print(f"### nb_var {wcnf.nv} nb_cons {len(wcnf.hard)+len(wcnf.soft)}")
+    if args.objective in ("total_power", "total_energy"):
+        # Every feasible schedule executes every task once. As an OPB objective,
+        # represent the constant cost with one forced-true variable.
+        fixed_name = "TOTAL_ENERGY_FIXED"
+        pbo.add_clause([fixed_name])
+        pbo.set_objective([sum(T[j]*W[j] for j in range(1, n+1))], [fixed_name])
     pbo.write_to_file(output_path)
+# Schedule-invariant metric for reporting alongside original OPB output.
+# PB files model peak; this number is NOT claimed to be an optimized energy saving.
+if __name__ == "__main__":
+    print(f"### TotalEnergy {sum(T[j]*W[j] for j in range(1,n+1))} "
+          f"TotalTaskPower {sum(W[1:])}")

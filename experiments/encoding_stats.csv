@@ -1,0 +1,9 @@
+instance,file,n,m,c,precedence_arcs,encoding,cnf_variables,cnf_clauses,encoding_time_s,total_energy_invariant
+BOWMAN8-1,benchmarks/1993/BOWMAN8-1.3pm,8,3,28,8,pairwise,405,12574,0.03334,1775
+BOWMAN8-1,benchmarks/1993/BOWMAN8-1.3pm,8,3,28,8,staircase,389,3507,0.05683,1775
+JACKSON-1,benchmarks/1993/JACKSON-1.3pm,11,2,23,13,pairwise,493,12509,0.0202,1223
+JACKSON-1,benchmarks/1993/JACKSON-1.3pm,11,2,23,13,staircase,471,3930,0.006,1223
+MERTENS-1,benchmarks/1993/MERTENS-1.3pm,7,2,15,6,pairwise,202,2814,0.00405,947
+MERTENS-1,benchmarks/1993/MERTENS-1.3pm,7,2,15,6,staircase,188,1098,0.00154,947
+small_example,examples/small_example.3pm,5,2,10,4,pairwise,101,922,0.00182,60
+small_example,examples/small_example.3pm,5,2,10,4,staircase,91,423,0.00063,60

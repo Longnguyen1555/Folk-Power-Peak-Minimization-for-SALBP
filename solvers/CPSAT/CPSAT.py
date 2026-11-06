@@ -1,3 +1,11 @@
+# Modern .3pm path with objective metrics; no flags keeps original CP-SAT code.
+import sys as _enh_sys
+from pathlib import Path as _enh_Path
+_enh_sys.path.insert(0, str(_enh_Path(__file__).resolve().parents[2]))
+from salb3pm.compat import enhanced_requested as _enh_requested, execute as _enh_execute
+if _enh_requested(_enh_sys.argv[1:]):
+    raise SystemExit(_enh_execute("cpsat", _enh_sys.argv[1:]))
+
 import time
 import sys
 import os
@@ -307,3 +315,6 @@ if __name__ == '__main__':
         print(f">>> Benchmark {os.path.basename(args.input_path)} OPT {int(solver.ObjectiveValue())}"
               f" TimeTot {end_time - start_time} TimeReal {end_time - trans_end_time} TimeTrans {trans_end_time - start_time}"
               f" Status {status_to_string(status)}")
+if __name__ == "__main__":
+    print(f"### TotalEnergy {sum(T[j]*W[j] for j in range(1,n+1))} "
+          f"TotalTaskPower {sum(W[1:])}")

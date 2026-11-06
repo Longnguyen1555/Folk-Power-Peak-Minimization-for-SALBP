@@ -13,6 +13,8 @@ set -e
 
 INSTANCE="$1"
 SOLVER="$2"
+if [ "$#" -ge 2 ]; then shift 2; else shift 1; fi
+EXTRA_ARGS=("$@")
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 SOLVER_DIR="$SCRIPT_DIR/../solvers/SAT_based"
 TIMEOUT=7200  # seconds
@@ -37,13 +39,13 @@ run_solver() {
     echo "========================================"
     echo "Running $solver_name on $(basename "$INSTANCE")"
     echo "========================================"
-    timeout "$TIMEOUT" python3 "$solver_file" "$INSTANCE" 2>&1 || echo "[$solver_name] Timeout or error."
+    timeout "$TIMEOUT" python3 "$solver_file" "$INSTANCE" "${EXTRA_ARGS[@]}" 2>&1 || echo "[$solver_name] Timeout or error."
     echo ""
 }
 
 if [ -z "$SOLVER" ]; then
     # Run all SAT-based solvers
-    for f in "$SOLVER_DIR"/*.py; do
+    for f in "$SOLVER_DIR"/Cadical-*.py "$SOLVER_DIR"/Maplesat-*.py; do
         run_solver "$f"
     done
 else
@@ -59,6 +61,10 @@ else
         maplesat-bs-i)  run_solver "$SOLVER_DIR/Maplesat-BS-I.py" ;;
         maplesat-su-e)  run_solver "$SOLVER_DIR/Maplesat-SU-E.py" ;;
         maplesat-su-i)  run_solver "$SOLVER_DIR/Maplesat-SU-I.py" ;;
+        multiple-sat)   run_solver "$SOLVER_DIR/MultipleSAT.py" ;;
+        incremental-sat) run_solver "$SOLVER_DIR/IncrementalSAT.py" ;;
+        binary-sat)     run_solver "$SOLVER_DIR/BinarySAT.py" ;;
+        paper-cuts)     run_solver "$SOLVER_DIR/StaircasePaperCuts.py" ;;
         *)
             echo "Unknown solver: $SOLVER"
             echo "Available: cadical-str, cadical-bs-e, cadical-bs-i, cadical-su-e, cadical-su-i"
