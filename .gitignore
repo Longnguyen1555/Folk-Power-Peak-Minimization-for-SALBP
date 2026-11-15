@@ -32,3 +32,6 @@ Thumbs.db
 
 # Large binaries
 roundingsat
+/tools/roundingsat/roundingsat.exe
+/tmp
+SAT_Sudoku_Solver.rar

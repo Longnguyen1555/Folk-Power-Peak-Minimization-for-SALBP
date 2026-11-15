@@ -6,7 +6,7 @@ import numpy as np
 import time
 import argparse
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="python this.py <path/to/lp>")
     parser.add_argument("input_path", help="path/to/lp")
     args = parser.parse_args()
@@ -36,8 +36,10 @@ if __name__ == '__main__':
         print("\n---------------------")
         print(f"@@@ {prob.solution.status[prob.solution.get_status()]}")
         # Output results-old: optimal objective value (minimum power peak)
-        print(f">>> Benchmark {os.path.basename(args.input_path)} OPT {int(prob.solution.get_objective_value())}"
-        f" TimeCost {end_time - start_time} TimeRead {read_end_time - start_time}")
+        print(
+            f">>> Benchmark {os.path.basename(args.input_path)} OPT {int(prob.solution.get_objective_value())}"
+            f" TimeCost {end_time - start_time} TimeRead {read_end_time - start_time}"
+        )
         # print(f"### {prob.solution.get_values()}")
     else:
         print("Solution is infeasible.")

@@ -1,0 +1,13 @@
+{
+  "datasets": ["benchmarks/1993/*.3pm"],
+  "methods": [
+    "multiple_sat", "incremental_sat", "binary_sat", "paper_cuts", "maxsat",
+    "pb", "cplex", "gurobi", "cpsat"
+  ],
+  "encodings": ["pairwise", "staircase"],
+  "objective": "peak",
+  "time_limit": 30,
+  "repeat": 1,
+  "resume": true,
+  "out": "experiments/matrix_all_1993_30s.csv"
+}

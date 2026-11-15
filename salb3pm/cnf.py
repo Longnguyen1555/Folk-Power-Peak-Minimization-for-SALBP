@@ -4,6 +4,7 @@ Each station threshold Q[i,k] means station_i <= k. Each time threshold
 B[i,t] means start_i <= t. Monotonic thresholds produce the staircase.
 The activity A[i,t] is equivalent to B[i,t] AND NOT B[i,t-duration_i].
 """
+
 from __future__ import annotations
 from itertools import combinations
 from dataclasses import dataclass
@@ -57,10 +58,10 @@ class Formula:
         # Sinz ladder: n vars, n-1 auxiliary vars, O(n) clauses.
         aux = [self.pool.new("amo", len(self.clauses), i) for i in range(len(lits) - 1)]
         self.add(-lits[0], aux[0])
-        for i in range(1, len(lits)-1):
+        for i in range(1, len(lits) - 1):
             self.add(-lits[i], aux[i])
-            self.add(-aux[i-1], aux[i])
-            self.add(-lits[i], -aux[i-1])
+            self.add(-aux[i - 1], aux[i])
+            self.add(-lits[i], -aux[i - 1])
         self.add(-lits[-1], -aux[-1])
 
     def exactly_one(self, lits: list[int], *, sequential: bool = True):
@@ -85,17 +86,45 @@ class Encoded:
         positives = {lit for lit in model if lit > 0}
         n = self.instance.n
         if self.encoding == "staircase":
-            station_values = tuple(next((k for k in range(self.instance.stations - 1)
-                                         if self.stations[(i,k)] in positives),
-                                        self.instance.stations-1) for i in range(n))
-            start_values = tuple(next((t for t in range(self.instance.cycle-self.instance.durations[i])
-                                       if self.starts[(i,t)] in positives),
-                                      self.instance.cycle-self.instance.durations[i]) for i in range(n))
+            station_values = tuple(
+                next(
+                    (
+                        k
+                        for k in range(self.instance.stations - 1)
+                        if self.stations[(i, k)] in positives
+                    ),
+                    self.instance.stations - 1,
+                )
+                for i in range(n)
+            )
+            start_values = tuple(
+                next(
+                    (
+                        t
+                        for t in range(self.instance.cycle - self.instance.durations[i])
+                        if self.starts[(i, t)] in positives
+                    ),
+                    self.instance.cycle - self.instance.durations[i],
+                )
+                for i in range(n)
+            )
         else:
-            station_values = tuple(next(k for k in range(self.instance.stations)
-                                        if self.stations[(i,k)] in positives) for i in range(n))
-            start_values = tuple(next(t for t in range(self.instance.cycle-self.instance.durations[i]+1)
-                                      if self.starts[(i,t)] in positives) for i in range(n))
+            station_values = tuple(
+                next(
+                    k
+                    for k in range(self.instance.stations)
+                    if self.stations[(i, k)] in positives
+                )
+                for i in range(n)
+            )
+            start_values = tuple(
+                next(
+                    t
+                    for t in range(self.instance.cycle - self.instance.durations[i] + 1)
+                    if self.starts[(i, t)] in positives
+                )
+                for i in range(n)
+            )
         return Schedule(station_values, start_values)
 
 
@@ -105,128 +134,183 @@ def encode(instance: Instance, encoding: str = "staircase") -> Encoded:
     n, m, c = instance.n, instance.stations, instance.cycle
     f = Formula()
     p = f.pool
-    a = {(i,t): p.new("active",i,t) for i in range(n) for t in range(c)}
+    a = {(i, t): p.new("active", i, t) for i in range(n) for t in range(c)}
     if encoding == "staircase":
-        q = {(i,k): p.new("station_le",i,k) for i in range(n) for k in range(m-1)}
-        b = {(i,t): p.new("start_le",i,t) for i in range(n)
-             for t in range(c-instance.durations[i])}
+        q = {(i, k): p.new("station_le", i, k) for i in range(n) for k in range(m - 1)}
+        b = {
+            (i, t): p.new("start_le", i, t)
+            for i in range(n)
+            for t in range(c - instance.durations[i])
+        }
         for i in range(n):
-            for k in range(m-2):
-                f.add(-q[i,k], q[i,k+1])
-            for t in range(c-instance.durations[i]-1):
-                f.add(-b[i,t], b[i,t+1])
+            for k in range(m - 2):
+                f.add(-q[i, k], q[i, k + 1])
+            for t in range(c - instance.durations[i] - 1):
+                f.add(-b[i, t], b[i, t + 1])
 
             def le(t):
                 if t < 0:
                     return False
-                if t >= c-instance.durations[i]:
+                if t >= c - instance.durations[i]:
                     return True
-                return b[i,t]
+                return b[i, t]
 
             for t in range(c):
-                l, r, act = le(t), le(t-instance.durations[i]), a[i,t]
+                l, r, act = le(t), le(t - instance.durations[i]), a[i, t]
                 f.add(-act, l)
                 f.add(-act, -r if type(r) is int else not r)
                 f.add((-l if type(l) is int else not l), r, act)
 
-        def neq(i,k):
+        def neq(i, k):
             if k == 0 and m == 1:
                 return []
             if k == 0:
-                return [-q[i,0]]
-            if k == m-1:
-                return [q[i,m-2]]
-            return [-q[i,k], q[i,k-1]]
+                return [-q[i, 0]]
+            if k == m - 1:
+                return [q[i, m - 2]]
+            return [-q[i, k], q[i, k - 1]]
 
         # station_i <= station_j: if j <= k then i <= k.
         for i, j in instance.precedence:
-            for k in range(m-1):
-                f.add(-q[j,k], q[i,k])
+            for k in range(m - 1):
+                f.add(-q[j, k], q[i, k])
             # On same station: start_i + duration_i <= start_j.
             # If start_j <= t, then start_i <= t-duration_i.
             for k in range(m):
-                guards = neq(i,k) + neq(j,k)
-                for t in range(c-instance.durations[j]+1):
-                    bj = b.get((j,t), True)
-                    bi = b.get((i,t-instance.durations[i]),
-                               False if t-instance.durations[i] < 0 else True)
-                    f.add(*guards,
-                          -bj if type(bj) is int else not bj,
-                          bi)
+                guards = neq(i, k) + neq(j, k)
+                for t in range(c - instance.durations[j] + 1):
+                    bj = b.get((j, t), True)
+                    bi = b.get(
+                        (i, t - instance.durations[i]),
+                        False if t - instance.durations[i] < 0 else True,
+                    )
+                    f.add(*guards, -bj if type(bj) is int else not bj, bi)
 
         for i in range(n):
-            for j in range(i+1,n):
+            for j in range(i + 1, n):
                 for k in range(m):
-                    guard = neq(i,k)+neq(j,k)
+                    guard = neq(i, k) + neq(j, k)
                     for t in range(c):
-                        f.add(-a[i,t],-a[j,t],*guard)
+                        f.add(-a[i, t], -a[j, t], *guard)
         return Encoded(instance, encoding, f, a, q, b)
 
-    q = {(i,k): p.new("station",i,k) for i in range(n) for k in range(m)}
-    b = {(i,t): p.new("start",i,t) for i in range(n)
-         for t in range(c-instance.durations[i]+1)}
+    q = {(i, k): p.new("station", i, k) for i in range(n) for k in range(m)}
+    b = {
+        (i, t): p.new("start", i, t)
+        for i in range(n)
+        for t in range(c - instance.durations[i] + 1)
+    }
     for i in range(n):
-        f.exactly_one([q[i,k] for k in range(m)], sequential=False)
-        f.exactly_one([b[i,t] for t in range(c-instance.durations[i]+1)], sequential=False)
+        f.exactly_one([q[i, k] for k in range(m)], sequential=False)
+        f.exactly_one(
+            [b[i, t] for t in range(c - instance.durations[i] + 1)], sequential=False
+        )
         for t in range(c):
-            covering = [b[i,s] for s in range(c-instance.durations[i]+1)
-                        if s <= t < s+instance.durations[i]]
+            covering = [
+                b[i, s]
+                for s in range(c - instance.durations[i] + 1)
+                if s <= t < s + instance.durations[i]
+            ]
             for start in covering:
-                f.add(-start,a[i,t])
-            f.add(-a[i,t],*covering)
-    for i,j in instance.precedence:
+                f.add(-start, a[i, t])
+            f.add(-a[i, t], *covering)
+    for i, j in instance.precedence:
         for ki in range(m):
             for kj in range(ki):
-                f.add(-q[i,ki],-q[j,kj])
+                f.add(-q[i, ki], -q[j, kj])
         for k in range(m):
-            for si in range(c-instance.durations[i]+1):
-                for sj in range(c-instance.durations[j]+1):
-                    if si+instance.durations[i] > sj:
-                        f.add(-q[i,k],-q[j,k],-b[i,si],-b[j,sj])
+            for si in range(c - instance.durations[i] + 1):
+                for sj in range(c - instance.durations[j] + 1):
+                    if si + instance.durations[i] > sj:
+                        f.add(-q[i, k], -q[j, k], -b[i, si], -b[j, sj])
     for i in range(n):
-        for j in range(i+1,n):
+        for j in range(i + 1, n):
             for k in range(m):
                 for t in range(c):
-                    f.add(-q[i,k],-q[j,k],-a[i,t],-a[j,t])
+                    f.add(-q[i, k], -q[j, k], -a[i, t], -a[j, t])
     return Encoded(instance, encoding, f, a, q, b)
 
 
 def atmost_power(encoded: Encoded, bound: int) -> list[list[int]]:
-    """Exact global load <= bound at every time, using PBEnc when installed.
-
-    Fallback: minimal-overweight subset clauses, limited to small n. PySAT's
-    PBEnc (binary merger) is the production encoder.
-    """
+    """Direct bounded PB form, available for encoding experiments."""
     ins = encoded.instance
-    if bound < 0:
-        return [[]]
     if bound >= ins.peak_upper_bound:
         return []
-    if bound < ins.peak_lower_bound:
-        return [[]]
-    try:
-        from pysat.pb import PBEnc, EncType
-        use_pysat = True
-    except ImportError:
-        use_pysat = False
-    output = []
-    for t in range(ins.cycle):
-        lits = [encoded.activities[i,t] for i in range(ins.n)]
-        if use_pysat:
-            cnf = PBEnc.atmost(lits=lits, weights=list(ins.powers), bound=bound,
-                                top_id=encoded.formula.pool.top,
-                                encoding=EncType.binmerge)
-            encoded.formula.pool.reserve(cnf.nv)
-            output.extend(cnf.clauses)
-        else:
-            if ins.n > 12:
-                raise RuntimeError("Install python-sat[pblib] for more than 12 tasks")
-            for k in range(1, ins.n+1):
-                for comb in combinations(range(ins.n),k):
-                    weight = sum(ins.powers[i] for i in comb)
-                    if weight > bound and weight-min(ins.powers[i] for i in comb) <= bound:
-                        output.append([-lits[i] for i in comb])
-    return output
+    return [
+        clause
+        for t in range(ins.cycle)
+        for clause in atmost_weighted(
+            encoded,
+            [encoded.activities[i, t] for i in range(ins.n)],
+            list(ins.powers),
+            bound,
+            ins.peak_lower_bound,
+        )
+    ]
+
+
+@dataclass
+class BinaryObjectiveBound:
+    """Reusable objective circuit; tightening only adds a binary comparator.
+
+    Unlike expanding each power into repeated totalizer inputs, this needs only
+    O(log upper) objective bits even when the input powers are large.
+    """
+
+    bits: list[int]  # least significant first
+    lower: int
+    upper: int
+
+    def atmost(self, bound: int) -> list[list[int]]:
+        if bound < self.lower:
+            return [[]]
+        if bound >= self.upper:
+            return []
+        # Exclude the first bit at which the value could exceed the bound.
+        return [
+            [-bit]
+            + [-self.bits[j] for j in range(i + 1, len(self.bits)) if bound & (1 << j)]
+            for i, bit in enumerate(self.bits)
+            if not bound & (1 << i)
+        ]
+
+
+def binary_objective_bank(encoded: Encoded, station_bank=None) -> BinaryObjectiveBound:
+    """Build load(t) <= binary objective once, for repeated SAT optimization.
+
+    Bound clauses can then be permanent (Incremental) or loaded into a freshly
+    built solver (Multiple). Requires PySAT with PBLib.
+    """
+    from pysat.pb import PBEnc, EncType
+
+    ins, f = encoded.instance, encoded.formula
+    upper = sum(station_bank[1]) if station_bank else ins.peak_upper_bound
+    bits = [f.pool.new("objective_bit", i) for i in range(upper.bit_length())]
+    weights = [1 << i for i in range(len(bits))]
+    mask = sum(weights)
+    rows = (
+        [station_bank]
+        if station_bank
+        else (
+            ([encoded.activities[i, t] for i in range(ins.n)], list(ins.powers))
+            for t in range(ins.cycle)
+        )
+    )
+    for lits, load_weights in rows:
+        cnf = PBEnc.atmost(
+            lits=list(lits) + [-x for x in bits],
+            weights=list(load_weights) + weights,
+            bound=mask,
+            top_id=f.pool.top,
+            encoding=EncType.binmerge,
+        )
+        f.pool.reserve(cnf.nv)
+        f.extend(cnf.clauses)
+    bank = BinaryObjectiveBound(bits, ins.peak_lower_bound, upper)
+    # Exclude unused binary values above the valid objective upper bound.
+    cap = BinaryObjectiveBound(bits, 0, mask)
+    f.extend(cap.atmost(upper))
+    return bank
 
 
 def station_peak_bank(encoded: Encoded) -> tuple[list[int], list[int]]:
@@ -245,49 +329,48 @@ def station_peak_bank(encoded: Encoded) -> tuple[list[int], list[int]]:
         prev = 0
         last = None
         for level in levels:
-            h = f.pool.new("station_peak_ge",k,level)
+            h = f.pool.new("station_peak_ge", k, level)
             bits.append(h)
-            weights.append(level-prev)
+            weights.append(level - prev)
             if last is not None:
-                f.add(-h,last)
-            prev,last = level,h
+                f.add(-h, last)
+            prev, last = level, h
             for i in range(ins.n):
                 if ins.powers[i] < level:
                     continue
                 if encoded.encoding == "pairwise":
-                    guards = [-encoded.stations[i,k]]
+                    guards = [-encoded.stations[i, k]]
                 elif ins.stations == 1:
                     guards = []
                 elif k == 0:
-                    guards = [-encoded.stations[i,0]]
-                elif k == ins.stations-1:
-                    guards = [encoded.stations[i,k-1]]
+                    guards = [-encoded.stations[i, 0]]
+                elif k == ins.stations - 1:
+                    guards = [encoded.stations[i, k - 1]]
                 else:
-                    guards = [-encoded.stations[i,k],encoded.stations[i,k-1]]
-                f.add(*guards,h)
+                    guards = [-encoded.stations[i, k], encoded.stations[i, k - 1]]
+                f.add(*guards, h)
     return bits, weights
 
 
-def atmost_weighted(encoded: Encoded, lits: list[int], weights: list[int],
-                    bound: int, lower_bound: int = 0) -> list[list[int]]:
+def atmost_weighted(
+    encoded: Encoded,
+    lits: list[int],
+    weights: list[int],
+    bound: int,
+    lower_bound: int = 0,
+) -> list[list[int]]:
+    from pysat.pb import PBEnc, EncType
+
     if bound < lower_bound:
         return [[]]
     if bound >= sum(weights):
         return []
-    try:
-        from pysat.pb import PBEnc, EncType
-        cnf = PBEnc.atmost(lits=lits,weights=weights,bound=bound,
-                            top_id=encoded.formula.pool.top,
-                            encoding=EncType.binmerge)
-        encoded.formula.pool.reserve(cnf.nv)
-        return cnf.clauses
-    except ImportError:
-        if len(lits) > 12:
-            raise RuntimeError("Install python-sat[pblib] for general PB constraints")
-        clauses=[]
-        for k in range(1,len(lits)+1):
-            for comb in combinations(range(len(lits)),k):
-                val=sum(weights[i] for i in comb)
-                if val>bound and val-min(weights[i] for i in comb)<=bound:
-                    clauses.append([-lits[i] for i in comb])
-        return clauses
+    cnf = PBEnc.atmost(
+        lits=lits,
+        weights=weights,
+        bound=bound,
+        top_id=encoded.formula.pool.top,
+        encoding=EncType.binmerge,
+    )
+    encoded.formula.pool.reserve(cnf.nv)
+    return cnf.clauses

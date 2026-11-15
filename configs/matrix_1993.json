@@ -1,0 +1,10 @@
+{
+  "datasets": ["benchmarks/1993/*.3pm"],
+  "methods": ["multiple_sat", "incremental_sat", "maxsat"],
+  "encodings": ["pairwise", "staircase"],
+  "objective": "peak",
+  "time_limit": 30,
+  "repeat": 1,
+  "resume": true,
+  "out": "experiments/matrix_1993_sat_maxsat_30s.csv"
+}

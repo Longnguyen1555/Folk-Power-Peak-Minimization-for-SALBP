@@ -34,19 +34,29 @@ The reference encoding replaces `Q` and `B` with one-hot variables `X_i,k` and `
 
 ## Tightening power using PySAT PBEnc
 
-For each `t`, encode `Σ_i w_i A_i,t ≤ K` using `PBEnc.atmost` (`EncType.binmerge`), with fresh auxiliary IDs. `K` starts at `best_peak−1` and is replaced by `new_best_peak−1` after an improved model. The strict cut is complete: UNSAT proves the incumbent is globally optimal since every improving schedule would satisfy all inherited feasibility constraints and the tested bound. `max_i w_i` is an unconditional lower bound; attaining it also proves optimality.
+Multiple and Incremental SAT use a reusable binary objective circuit. With bits `e_j`, define `V = Σ_j 2^j e_j` and `M = Σ_j 2^j`. For every time slot, encode `Σ_i w_i A_i,t + Σ_j 2^j ¬e_j ≤ M` using `PBEnc.atmost` (`EncType.binmerge`). Thus `load(t) ≤ V`. Cap `V` by the valid upper bound. For `station_peak_sum`, use the weighted station-peak bank as the load instead. Build this circuit once per solver, then tighten using binary comparator clauses `V ≤ K`; no new PB auxiliaries are needed for each bound. `K` starts at `best_peak−1` and is replaced by `new_best_peak−1` after an improved model. UNSAT proves the incumbent globally optimal; reaching `max_i w_i` also proves optimality.
 
-- **Multiple SAT:** solve each decision instance using a *new* SAT solver. Since `K` strictly decreases, the new bound implies all earlier peak bounds, so it is safe to build the new solver from base CNF plus the latest bound.
-- **Incremental SAT:** instantiate the solver once, then append PB clauses for each stricter bound. Unique auxiliary IDs avoid variable aliasing. Native PySAT retains the CDCL engine and learned state; the offline fallback retains clauses but is NOT CDCL.
+- **Multiple SAT:** rebuild feasibility CNF and the objective circuit, then create a *new* SAT solver for each bound. Since `K` strictly decreases, only the latest bound is needed. Encoding rebuild time is included in elapsed time.
+- **Incremental SAT:** instantiate the solver and objective circuit once, then permanently append comparator clauses for each stricter bound. Native PySAT retains the CDCL engine and learned state. This follows the uploaded Sudoku project's reusable-counter/permanent-bound idea; Sudoku's Multiple uses binary search with temporary assumptions, which is deliberately not adopted here, following the user's selected semantics. Power weights are represented in binary rather than replicated as totalizer inputs.
 - **Paper cuts:** if a SAT model has load `≥ best_peak` at `t`, find an inclusion-minimal active task subset with weight `≥ best_peak`. Ban all its members from being simultaneously active, for **every** time slot. Every schedule improving the incumbent must satisfy that cut. Repetition to UNSAT is exact, though slower than direct PB bounds on some instances.
 
-## Weighted MaxSAT peak formulation
+Binary SAT uses the same binary objective circuit with a comparator for each midpoint. PySAT CaDiCaL uses repeated conflict-budget slices on the same solver to check the deadline, since its interrupt API is unsupported; CaDiCaL195 is the only SAT backend, with no alternate solver or DPLL fallback. A conflict slice is not a hard wall-clock limit: use the supervised subprocess runner for externally enforced cutoffs.
 
-With valid upper bound `U = sum of m largest task power values`, use unary Booleans `z_l` for levels `l=1,..,U`. Add soft `¬z_l` (unit cost), monotonic hard clauses `z_{l+1}⇒z_l`, and for each time `t` a hard PB inequality:
+## Binary weighted MaxSAT
 
-`Σ_i w_i A_i,t + Σ_{l=1}^U ¬z_l ≤ U`.
+Build the same binary objective circuit `load(t) <= V`, with `V = sum_j 2^j e_j`.
+The hard CNF contains feasibility, the PB circuit and the upper-bound comparator.
+For each bit, add the soft unit clause `not e_j` with weight `2^j`. The MaxSAT cost
+is exactly V; minimization makes it equal to the actual global peak. For
+`station_peak_sum`, bound the weighted station-capacity bank by V and penalize
+the same binary bits. RC2's cost is checked against the decoded schedule.
 
-This is algebraically equivalent to `P(t)≤Σ_l z_l`. The minimum MaxSAT cost `Σ_l z_l` equals the optimal global power peak. RC2's reported cost is independently checked against the decoded schedule's actual peak. This is a (potentially sizable) **unary** peak formulation; the research contributions here are primarily the staircase feasibility representation and two SAT search workflows, not a new binary MaxSAT encoding.
+Only RC2 with CaDiCaL195 is used. Original MSAT-E binary export, including its
+reduction rules, lives in `salb3pm/paper.py`; the shared model lives in
+`salb3pm/cnf.py`. These are distinct feasibility formulations with the same
+SALB3PM objective. Paper export normalizes the lower bound to `max(w_i)`, uses
+`upper.bit_length()` bits and explicitly selects Binary Merger. The I/unary
+variant has been removed.
 
 ## Gurobi MIP
 
@@ -64,8 +74,20 @@ For each time, `Σ_i w_i a_i,t ≤ Pmax`; minimize `Pmax`. This exactly models t
 
 With every task executed exactly once, `Σ_t P(t) = Σ_i w_i d_i`. Minimizing this number does **not** distinguish feasible schedules. Accordingly `total_energy` is always computed/reported and its objective has an explicit feasibility-only proof. Likewise `(peak,total_energy)` is equivalent to peak minimization.
 
-A distinct optional objective `station_peak_sum = Σ_k max{w_i : k_i=k}` captures the sum of peak capacities to install per workstation, not total consumed energy. It uses a compact set of weighted thresholds over distinct input power levels. For sorted power levels `0=p_0<p_1<...<p_r`, create `H_k,p_l = [station_peak_k≥p_l]`, force `H_k,p_l` for any assignment of task power ≥`p_l` to station `k`, and penalize `H_k,p_l` by `p_l−p_{l−1}`. Then the minimal weighted sum is exactly `station_peak_sum`. The SAT variants add `PBEnc.atmost` on this weighted sum, RC2 optimizes the weighted soft negative thresholds, and Gurobi uses one nonnegative station peak variable per workstation. This objective is **not** claimed to equal total energy or the SALB3PM paper's peak criterion.
+A distinct optional objective `station_peak_sum = Σ_k max{w_i : k_i=k}` captures the sum of peak capacities to install per workstation, not total consumed energy. It uses a compact set of weighted thresholds over distinct input power levels. For sorted power levels `0=p_0<p_1<...<p_r`, create `H_k,p_l = [station_peak_k≥p_l]`, force `H_k,p_l` for any assignment of task power ≥`p_l` to station `k`, and weight it by `p_l−p_{l−1}`. The minimal weighted sum is exactly `station_peak_sum`. SAT and RC2 bound this weighted sum by a binary objective V; SAT tightens V and RC2 optimizes its bit costs. Gurobi uses one nonnegative station peak variable per workstation. This objective is **not** claimed to equal total energy or the SALB3PM paper's peak criterion.
 
 ## Research protocol and known limitations
 
-All methods must use identical `.3pm` inputs, same hardware and wall-clock cap, and an independent schedule validator. Report `OPTIMAL` separately from `TIMEOUT` with incumbent. Match results only when they are proved; report clause counts, variables, solver calls, time and memory if measured. Compare both SAT methods under each encoding and contrast against RC2/Gurobi only when actually installed and executed. The included DPLL fallback serves tiny smoke tests, not performance claims. An automatic hard cutoff is not guaranteed for RC2 under the current API wrapper. This version is based on the user-uploaded original archive, whose 430 benchmark .3pm files and original solver entry points were inspected/preserved. A new PySAT/Gurobi runtime environment remains necessary for a full performance reproduction.
+Use identical input instances, a fixed machine and independent schedule validation.
+SAT and MaxSAT use CaDiCaL195 exclusively; PB clauses use Binary Merger. Gurobi
+and CP-SAT retain their native engines and run on one thread/worker. Report
+OPTIMAL separately from TIMEOUT with an incumbent. In-process RC2 has only an
+advisory time limit; CaDiCaL checks deadlines between conflict-budget slices.
+Use the isolated subprocess runner for externally enforced cutoffs.
+
+The source is split into `backends.py`, `results.py` and the `solvers/` package;
+`from salb3pm.solvers import solve` remains the public dispatcher. `cnf_clauses`
+for descending Multiple/Incremental is cumulative emitted clauses, including
+rebuilt base circuits in Multiple. Binary SAT reports the maximum loaded formula
+size. Do not compare these statistics as if all were peak memory measurements.
+Regenerate historical result files after changing backends or formulations.

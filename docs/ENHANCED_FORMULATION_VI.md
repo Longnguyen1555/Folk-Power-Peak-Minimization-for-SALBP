@@ -1,68 +1,66 @@
-# Mô hình bổ sung cho SALB3PM: staircase, Multiple/Incremental SAT, Gurobi
+# T? ch?c v? thu?t to?n SALB3PM
 
-## 1. Kế thừa repo gốc
+## C?u tr?c m? ngu?n
 
-Dữ liệu `.3pm` giữ nguyên dạng `n m c`, sau đó `n` cặp `(d_j,w_j)`, tiếp theo là các cung trước–sau `i,j` (đánh số từ 1) kết thúc bằng `-1,-1`. Repo đã có sẵn SAT-SU, SAT-BS, STR, MaxSAT E/I, PBO E/I, CP-SAT và Gurobi đọc mô hình `.lp`. Cải tiến dùng model đầu vào và tính hợp lệ như gốc; không gỡ bỏ cấu hình có sẵn.
+- `salb3pm/model.py`: instance, parser, validator ??c l?p.
+- `salb3pm/cnf.py`: CNF pairwise/Staircase, m?ch m?c ti?u PB binary.
+- `salb3pm/backends.py`: ch? CaDiCaL195, kh?ng t? chuy?n backend.
+- `salb3pm/results.py`: schema k?t qu?, t?n m?c ti?u v? ki?m tra nghi?m.
+- `salb3pm/solvers/sat.py`: Multiple, Incremental, Binary SAT, Paper Cuts.
+- `salb3pm/solvers/maxsat.py`: MaxSAT binary, RC2 v?i oracle CaDiCaL195.
+- `salb3pm/solvers/gurobi.py`, `cpsat.py`: m? h?nh native t??ng ?ng.
+- `salb3pm/paper.py`: binary g?c MSAT-E v? c?c reduction rules, tr?ng th?i ri?ng m?i l?n build.
+- `salb3pm/export.py`: xu?t WCNF/OPB; `cli.py`: giao di?n d?ng l?nh duy nh?t.
 
-## 2. Bài toán và mục tiêu
+`salb3pm/solvers.py` c? ?? ???c thay b?ng package `salb3pm/solvers/`.
+API `from salb3pm.solvers import solve` v?n gi? nguy?n. C?c file d??i `solvers/`
+l? shortcut ng?n; lo?i b? MapleSAT, c?c b?n I/unary v? c?c file E/I SAT tr?ng l?p.
 
-Với mỗi công việc `j`, chọn trạm `K_j in {0,...,m-1}` và thời điểm bắt đầu `S_j in {0,...,c-d_j}`.
+## Encoding v? precedence
 
-- Mỗi việc được xử lý tại một trạm, một thời điểm bắt đầu, liên tục trong `d_j` đơn vị.
-- Trong mỗi đơn vị thời gian, mỗi trạm xử lý tối đa một việc.
-- Cung `(i,j)` yêu cầu `K_i <= K_j`; nếu `K_i=K_j` thì `S_i+d_i <= S_j`.
-- Định nghĩa `A_{j,t}=[S_j <= t < S_j+d_j]`, `P(t)=sum_j w_j A_{j,t}`.
-- **Peak:** `min max_{t=0}^{c-1} P(t)`.
-- **Total power (discrete integral):** `sum_t P(t) = sum_j d_j w_j`, hằng số. Cả `total_energy` và `total_power` chỉ gọi giải khả thi và báo đúng số này. Nếu muốn độ đo khác không hằng, cần đổi tên và định nghĩa rõ.
-- `peak_then_total_power` giữ nghiệm tối ưu peak do mục tiêu thứ hai bất biến.
-- **Độ đo mở rộng tùy chọn:** `station_peak_sum = sum_k max({w_j:K_j=k} ∪ {0})`, khác peak và khác total energy.
+Gi? pairwise v? Staircase ?? so s?nh. Binary l? c?ch bi?u di?n **m?c ti?u**,
+kh?ng thay th? encoding precedence. V?i `Q[i,k] = [station_i <= k]`, th?m
+`not Q[j,k] or Q[i,k]` cho c?nh i tr??c j. V?i `B[i,t] = [start_i <= t]`, khi
+c?ng tr?m th?m `B[j,t] -> B[i,t-duration_i]`. Do ?? predecessor ph?i k?t th?c
+tr??c successor tr?n c?ng tr?m, nh?ng c? th? ch?y ??ng th?i ? c?c tr?m kh?c nhau.
+Xem c?ng th?c chi ti?t trong [FORMULATION.md](FORMULATION.md).
 
-## 3. Staircase (order) encoding, với mốc và biên chính xác
+## Multiple v? Incremental
 
-- `Q_{j,k}` biểu diễn `K_j <= k`, với `k = 0,...,m-2`.
-- `B_{j,t}` biểu diễn `S_j <= t`, với `t = 0,...,c-d_j-1`.
-- Mệnh đề đơn điệu `¬Q_{j,k} ∨ Q_{j,k+1}`, `¬B_{j,t} ∨ B_{j,t+1}` tạo cầu thang.
-- Quy ước biên: `B_{j,t}=false` nếu `t<0`, `B_{j,t}=true` nếu `t >= c-d_j`.
-- Với mọi cung `i->j`, thêm `¬Q_{j,k} ∨ Q_{i,k}` để cấm trạm i sau trạm j.
-- `A_{j,t} ↔ (B_{j,t} ∧ ¬B_{j,t-d_j})` (ba mệnh đề CNF, tối giản ở biên).
-- Với hai việc i,j cùng trạm k, nếu j bắt đầu không muộn hơn t thì i phải bắt đầu không muộn hơn `t-d_i`; biểu diễn bằng `(K_i!=k) ∨ (K_j!=k) ∨ ¬B_{j,t} ∨ B_{i,t-d_i}`.
-- Cấm trùng trạm và thời điểm: `(K_i!=k) ∨ (K_j!=k) ∨ ¬A_{i,t} ∨ ¬A_{j,t}`.
-- Điều kiện `K_i!=k` là một hoặc hai literal Q (ở biên chỉ một), nên không cần biến one-hot X trong mô hình staircase. Pairwise baseline sử dụng one-hot cho trạm và start, thêm pairwise conflicts.
+M?ch binary `V = sum_j 2^j e_j` ch?n t?i t?i m?i th?i ?i?m b?ng V. D?ng
+`PBEnc` v?i Binary Merger. T? nghi?m c? peak v, th?m comparator `V <= v-1`.
+SAT th? l?u nghi?m t?t h?n; UNSAT ch?ng minh t?i ?u. ??t `max(w_i)` c?ng ch?ng
+minh t?i ?u. Kh?ng c?n t?o m?ng PB m?i cho m?i comparator.
 
-**Đúng đắn:** Chuỗi `Q`/`B` đơn điệu xác định duy nhất một nhãn trạm/start, kể cả khi không có ngưỡng nào true (chọn giá trị cuối). Liên kết A tương đương hoạt động thực tế tại mỗi slot. Do đó mỗi mô hình thỏa CNF giải mã thành lịch hợp lệ. Chiều ngược: lịch hợp lệ gán ngưỡng `Q`, `B` theo so sánh `<=` và gán `A` theo khoảng hoạt động, thỏa mọi mệnh đề. Hai encoding giữ cùng tập nghiệm lịch khi chiếu bỏ biến phụ.
+- Multiple x?y l?i to?n b? CNF kh? thi v? m?ch m?c ti?u, t?o solver m?i ? m?i bound.
+- Incremental t?o m?t solver/m?ch m?c ti?u, append c?c clause si?t c?n v?nh vi?n.
+- Binary SAT t?m ki?m nh? ph?n; m?i midpoint t?o solver m?i v?i comparator t??ng ?ng.
+- Paper Cuts d?ng solver b?n v?ng v? th?m clause c?m t?p c?ng vi?c g?y qu? t?i.
 
-## 4. Siết cận bằng PBEnc của PySAT
+Incremental h?c nguy?n t?c b? ??m d?ng l?i + c?n v?nh vi?n t? RAR Sudoku.
+Theo l?a ch?n c?a ng??i d?ng, Multiple kh?ng sao ch?p c?ch binary search b?ng
+assumption tr?n c?ng solver c?a Sudoku. C? Multiple/Incremental c?a SALB3PM
+??u gi?m bound sau nghi?m, nh?ng ch? Incremental gi? solver v? learned clauses.
 
-Với cận peak U tại mỗi slot t, tạo CNF cho pseudo-Boolean `sum_j w_j A_{j,t} <= U` qua `pysat.pb.PBEnc.atmost(..., encoding=EncType.binmerge)`. Các biến phụ được cấp ID không trùng với biến hiện có và trước đó. Nếu chưa cài PySAT, có fallback liệt kê minimal overweight subsets cho n<=12 để kiểm thử nhỏ (không dùng làm hiệu năng công bố). 
+## MaxSAT v? export
 
-### Multiple SAT
+MaxSAT d?ng soft `not e_j` tr?ng s? `2^j`; cost b?ng V v? ???c ??i chi?u v?i
+peak th?c t?. RC2 d?ng CaDiCaL195. C?c counter n?i b? do RC2 sinh v?n thu?c
+thu?t to?n RC2, kh?ng ph?i m?t bi?n th? m?c ti?u unary c?a SALB3PM.
 
-Giải CNF khả thi lần đầu. Từ peak hiện tại `v`, khởi tạo bộ giải **mới** với `base_CNF AND (P(t) <= v-1 for all t)`. Nếu SAT thì ghi nhận lịch mới và lặp. Nếu UNSAT thì lịch incumbent được chứng minh tối ưu. Khi đã đạt `max_j w_j`, dừng nhờ cận dưới.
+Export `shared` d?ng CNF chung; `paper` gi? m? h?nh MSAT-E/reduction g?c,
+chu?n h?a LB=max(w_i), s? bit t?i thi?u v? Binary Merger. OPB l? b?n chuy?n
+c?c hard CNF clause v? chi ph? bit sang PB, kh?ng c?n m?t b? m? h?a PBO tr?ng l?p.
+`MSAT-E.py`/`PBO-E.py` ch? export; gi?i d?ng `RC2-SALB3PM.py` ho?c CLI `maxsat`.
 
-### Incremental SAT
+## Gi?i h?n th?i gian v? s? li?u
 
-Cũng siết chặt từ `v` xuống `v-1`, nhưng khởi tạo **một** solver và `add_clause(...)` vào chính solver đang sống. Giữ lại các PB constraints và các clause học được trong CDCL (nếu dùng PySAT). Kết thúc tương tự khi UNSAT. DPLL dự phòng có add_clause đúng ngữ nghĩa nhưng không giữ learned clauses, không dùng để chứng minh lợi thế runtime của incremental CDCL.
+CaDiCaL kh?ng h? tr? interrupt API c?a PySAT n?n wrapper gi?i theo conflict
+budget v? ki?m tra deadline gi?a c?c l??t; h?t budget kh?ng ph?i UNSAT.
+RC2 ch? c? advisory limit trong process. ?o c? hard cutoff b?ng
+`scripts/experiment_matrix.py`. Gurobi/CP-SAT d?ng m?t thread/worker; log Gurobi
+???c t?t tr??c khi t?o model ?? stdout l? JSON h?p l?.
 
-### Binary SAT
-
-Giữ `[LB,UB]` với LB=`max_j w_j`, UB từ nghiệm hiện có. Với `mid=floor((LB+UB)/2)`: SAT với peak<=mid thì cập nhật UB bằng peak nghiệm mới; UNSAT thì LB=mid+1. Mỗi phép thử tái khởi tạo SAT backend. Khi LB=UB, tối ưu được chứng minh.
-
-### Paper Cuts
-
-Dựa ý tưởng Py et al. (2024): từ một thời điểm đạt peak hiện tại, trích tập việc cùng hoạt động với tổng công suất >= incumbent rồi cấm tập đó đồng thời hoạt động tại mọi slot. Lặp với solver hiện hành đến UNSAT.
-
-## 5. MIP trực tiếp từ `.3pm` và RC2
-
-- **Gurobi:** biến X nhị phân trạm, Y nhị phân thời điểm bắt đầu, biểu thức hoạt động A từ Y, biến peak nguyên. Ràng buộc đúng về assignment, trước–sau, nonoverlap và công suất mỗi slot. Mục tiêu peak / total_energy / station_peak_sum. Không cần mô hình `.lp` tạo ngoài. Trình giải gốc đọc `.lp` vẫn dùng được.
-- **CP-SAT:** biến trạm và interval tùy chọn, `NoOverlap` trên mỗi trạm, reified precedence và activity; hỗ trợ cùng bộ metrics.
-- **RC2 MaxSAT:** cứng = CNF khả thi staircase/pairwise + PB constraints, mềm = phủ định các ngưỡng peak unary; tổng soft-weight tối ưu bằng peak. Việc xuất WCNF E/I gốc được giữ nguyên.
-- **PB OPB gốc:** `--objective total_power` tạo một biến cố định bằng 1 với hệ số `sum d_j w_j`. Bài toán tối ưu trở thành quyết định tính khả thi, đúng bản chất mục tiêu bất biến.
-
-## 6. Kiểm thử và báo cáo thực nghiệm
-
-- `tests/test_enhanced.py`: ví dụ công bố, enumeration brute force, tính tương đương hai encoding khi chiếu mô hình, bất biến năng lượng và optional backend tests.
-- `tests/test_integration.py`: 12 DAG ngẫu nhiên kiểm tra peak tối ưu cho cả ba chiến lược SAT, kiểm tra tái khởi tạo solver, tính tương thích CLI từ các file upstream.
-- `scripts/encoding_stats.py`: so sánh biến/mệnh đề **base feasibility CNF**, không trộn size PB objective và khác biệt chiến lược tìm kiếm.
-- `scripts/experiment_matrix.py`: so sánh các methods với time limit cứng mỗi process, lấy peak, energy, thời gian, trạng thái; `OPTIMAL` chỉ khi có chứng chỉ từ solver chính xác.
-
-**Lưu ý:** Các số smoke trong ZIP được chạy bằng DPLL fallback do thiếu PySAT/OR-Tools/Gurobi ở môi trường xây dựng. Chưa có benchmark chính thức lớn và không được so sánh thời gian đó với bảng paper gốc. Kích thước CNF/ số biến là số thật của code chạy, độc lập backend.
+T?ng n?ng l??ng `sum_i duration_i * power_i` l? h?ng s?. Kh?ng di?n gi?i t?i ?u
+h?ng s? n?y th?nh ti?t ki?m n?ng l??ng. `station_peak_sum` l? m?c ti?u c?ng su?t
+l?p ??t kh?c v?i peak to?n h? th?ng. C?n ch?y l?i s? li?u c? sau refactor.

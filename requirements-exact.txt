@@ -1,0 +1,3 @@
+# Optional MIP APIs; licenses/Community Edition limits still apply.
+gurobipy>=10.0
+cplex>=22.1

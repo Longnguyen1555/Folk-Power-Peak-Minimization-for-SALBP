@@ -1,4 +1,5 @@
 """Problem model, reference parser, objective metrics, and independent validator."""
+
 from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
@@ -62,13 +63,13 @@ class Instance:
 
     @property
     def peak_upper_bound(self) -> int:
-        return sum(sorted(self.powers, reverse=True)[:self.stations])
+        return sum(sorted(self.powers, reverse=True)[: self.stations])
 
 
 @dataclass(frozen=True)
 class Schedule:
     stations: tuple[int, ...]  # zero based
-    starts: tuple[int, ...]    # zero based
+    starts: tuple[int, ...]  # zero based
 
 
 def validate(instance: Instance, schedule: Schedule) -> dict:
@@ -76,7 +77,9 @@ def validate(instance: Instance, schedule: Schedule) -> dict:
     n, c = instance.n, instance.cycle
     if len(schedule.stations) != n or len(schedule.starts) != n:
         raise ValueError("Schedule length mismatch")
-    for i, (k, s, d) in enumerate(zip(schedule.stations, schedule.starts, instance.durations)):
+    for i, (k, s, d) in enumerate(
+        zip(schedule.stations, schedule.starts, instance.durations)
+    ):
         if not isinstance(k, int) or not 0 <= k < instance.stations:
             raise ValueError(f"Task {i+1} has invalid station {k}")
         if not isinstance(s, int) or not 0 <= s <= c - d:
@@ -84,8 +87,10 @@ def validate(instance: Instance, schedule: Schedule) -> dict:
     for i, j in instance.precedence:
         if schedule.stations[i] > schedule.stations[j]:
             raise ValueError(f"Invalid station precedence: {i+1} -> {j+1}")
-        if schedule.stations[i] == schedule.stations[j] and \
-           schedule.starts[i] + instance.durations[i] > schedule.starts[j]:
+        if (
+            schedule.stations[i] == schedule.stations[j]
+            and schedule.starts[i] + instance.durations[i] > schedule.starts[j]
+        ):
             raise ValueError(f"Invalid same-station precedence: {i+1} -> {j+1}")
     profile = [0] * c
     per_station = [[0] * c for _ in range(instance.stations)]
@@ -118,29 +123,42 @@ def load_instance(path: str | Path) -> Instance:
         durations = tuple(int(t) for t in data["durations"])
         powers = tuple(int(w) for w in data["powers"])
         base = int(data.get("precedence_index_base", 1))
-        arcs = tuple((int(i) - base, int(j) - base) for i, j in data.get("precedence", []))
-        return Instance(durations, powers, int(data["stations"]), int(data["cycle"]), arcs, path.stem)
+        arcs = tuple(
+            (int(i) - base, int(j) - base) for i, j in data.get("precedence", [])
+        )
+        return Instance(
+            durations,
+            powers,
+            int(data["stations"]),
+            int(data["cycle"]),
+            arcs,
+            path.stem,
+        )
     if path.suffix.lower() != ".3pm":
         raise ValueError("Supported input formats are .3pm and .json")
     # Widely used format: n m c; n lines 'duration power'; i,j arcs ended by '-1,-1'.
-    lines = [l.strip() for l in raw.splitlines() if l.strip() and not l.lstrip().startswith(("c ", "#", "%"))]
+    lines = [
+        l.strip()
+        for l in raw.splitlines()
+        if l.strip() and not l.lstrip().startswith(("c ", "#", "%"))
+    ]
     if not lines:
         raise ValueError("Empty instance")
     n, m, c = [int(x) for x in re.split(r"[\s,]+", lines[0])]
     if len(lines) < 1 + n:
         raise ValueError("Insufficient task rows")
     durations, powers = [], []
-    for line in lines[1:1+n]:
+    for line in lines[1 : 1 + n]:
         d, w = [int(x) for x in re.split(r"[\s,]+", line)]
         durations.append(d)
         powers.append(w)
     arcs = []
-    for line in lines[1+n:]:
+    for line in lines[1 + n :]:
         terms = [int(x) for x in re.split(r"[\s,]+", line)]
         if len(terms) != 2:
             raise ValueError(f"Malformed precedence arc: {line}")
         i, j = terms
         if i == j == -1:
             break
-        arcs.append((i-1, j-1))
+        arcs.append((i - 1, j - 1))
     return Instance(tuple(durations), tuple(powers), m, c, tuple(arcs), path.stem)

@@ -1,3 +1,11 @@
+# Current refactor (2026-11-14)
+
+The earlier entries below describe historical versions. Current code uses only
+CaDiCaL195 as SAT oracle, binary SAT/MaxSAT objectives, a solvers package, one CLI,
+and export-only MSAT-E/PBO-E shortcuts. MapleSAT, I variants, duplicate E/I SAT
+sources, the DPLL fallback and selectable SAT backends are removed. See README
+for the current layout and commands. Historical output files are preserved.
+
 # Changes relative to the uploaded ORIGINAL repository
 
 This folder was created by unpacking `SALB3PM-Satisfiability_based_complete_methods-main.zip` and retaining all 440+ provided benchmark .3pm files and the original source code structure.

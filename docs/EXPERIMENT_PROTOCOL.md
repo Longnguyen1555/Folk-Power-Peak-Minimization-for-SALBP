@@ -1,37 +1,53 @@
-# Experimental protocol for Assignment 2
+# Experiment protocol
 
-This implementation is a starting point for a scientific report, not evidence of large-instance performance. The course requirements ask for SAT/MaxSAT, PySAT pseudo-Boolean encoding, comparison to exact mathematical solvers such as Gurobi, experiments with large benchmark instances, and transparent GitHub/data availability.
+Compare Multiple SAT, Incremental SAT, Binary SAT, paper cuts, binary MaxSAT,
+Gurobi and CP-SAT on identical `.3pm` instances. SAT and RC2 use CaDiCaL195;
+PB clauses use Binary Merger. Retain pairwise/staircase feasibility ablations.
+Original MSAT-E binary exports are a separate baseline from the shared CNF.
+The current backend policy follows the user's CaDiCaL-only choice, so it does
+not reproduce EvalMaxSAT performance tables from the paper.
 
-## Questions / ablations
+## Running
 
-1. For fixed method and instance, does staircase vs pairwise reduce **base feasibility** CNF variables/clauses? Does that yield lower wall-clock time, peak RSS, and timeout rate after objective PB clauses are included?
-2. For fixed staircase encoding and PB encoding, does persistent incremental SAT improve time relative to independent SAT calls (same solver, version, phase heuristic, seed and wall-clock limit)?
-3. How do `paper_cuts`, RC2 MaxSAT and Gurobi compare in time, solution value, and number of instances *proved optimal* under the same budget?
-4. Are all `total_energy` values identical across feasible schedules, as guaranteed mathematically? Do `station_peak_sum` and global peak trade off on selected instances? **Do not** call station peak sum total energy.
+The focused default is now `configs/matrix_1993.json`: all local 1993 instances,
+Multiple/Incremental/MaxSAT x pairwise/staircase, 30 seconds. Run
+`PYTHON=python bash scripts/run_matrix.sh`; add `--dry-run` to inspect the grid.
+See [RUN_MATRIX.md](RUN_MATRIX.md) for configuration and result fields.
 
-## Benchmark design
+```powershell
+python scripts/experiment_matrix.py "benchmarks/1993/MERTENS-*.3pm" --time-limit 3600 --repeat 3 --out experiments/current.csv
+python scripts/encoding_stats.py "benchmarks/1993/MERTENS-*.3pm" --out experiments/current_sizes.csv
+```
 
-Use at least three sizes/families from recognized SALB3PM datasets, including benchmark `.3pm` files. Fix and record the source commit/hash of every dataset; preserve original energy weights rather than regenerate silently. Before solving, check that `m`, `c`, and each `d_i` are valid, that the precedence DAG is well formed, and that the instance is not trivially infeasible.
+Use the isolated runner for hard termination: its subprocess cap is the requested
+time including startup, without extra grace. Direct CLI/benchmark calls do not
+provide a hard cutoff for RC2. CaDiCaL checks deadlines between conflict-budget
+slices, which also cannot guarantee immediate wall-clock termination. When a
+subprocess is killed, the latest published counts and incumbent peak are retained;
+the full incumbent schedule is not recovered.
+Gurobi and CP-SAT use one thread/worker and retain their native engines.
 
-For each instance/solver, run at least three repetitions on the same isolated machine; record CPU model, operating system, RAM, PySAT, CDCL backends, RC2, Gurobi and Python versions, Gurobi academic/commercial license availability, random seeds, and all solver options. A wall-clock cap of 3,600 s (or instructor-agreed budget) should be applied consistently. The current RC2 wrapper has **advisory only** wall-time limit; for enforceable research-level RC2 timeouts invoke each solver in a supervised subprocess with an OS-level timeout (and preserve partial results if possible).
+## Recording and comparing
 
-Use `python scripts/experiment_matrix.py 'benchmarks/1993/MERTENS-*.3pm' --time-limit 3600 --repeat 3` for capped per-process runs. `python scripts/encoding_stats.py` generates size-only ablations without solving. Each run must be verified by the independent validator, and mismatched objective values investigated before analysis.
+Record machine/OS/RAM, Python, PySAT, CaDiCaL, PBLib, OR-Tools and Gurobi versions,
+license limits, repository commit and dataset provenance. Use at least three
+repetitions under the same resource limits. Verify all schedules independently;
+separate OPTIMAL, INFEASIBLE, TIMEOUT and UNAVAILABLE. A feasible timeout result
+is not proof of optimality. In-process elapsed time includes encoding; subprocess
+wall time also includes interpreter startup.
 
-Record: `status` (OPTIMAL / TIMEOUT / INFEASIBLE / UNAVAILABLE), incumbent `peak`, invariant `total_energy`, optional `station_peak_sum`, elapsed time, iterations, counts of CNF variables/clauses, and hardware metadata. The current `cnf_clauses` in repeated SAT searches is the **cumulative clauses emitted** (not necessarily peak loaded CNF size); `cnf_vars` is the maximum allocated ID. For fair formula-size comparison report base CNF and largest/current solver CNF separately using extended instrumentation.
+Record objective, value, elapsed time, solver calls/instances, backend and proof.
+CSV `clauses` is now the maximum loaded input-formula count, from the new
+`cnf_peak_clauses` field; MaxSAT includes hard and soft clauses. Raw JSON's legacy
+`cnf_clauses` counter is cumulative for Multiple/Incremental and is not directly
+comparable to maximum loaded size. Measure process memory separately; these
+counts exclude learned clauses and RC2 internal counters. Base encoding statistics do
+not include objective clauses. Native models use encoding=native.
 
-## Research reporting
-
-Prepare a table of solved-to-optimal counts by family, median runtime on shared optima, PAR-2 with timeouts, CNF variable/constraint counts, and memory use if measured with an external process monitor. Plot **paired** staircase/pairwise ratios, with the same instance, solver and bound strategy on both sides. Do not interpret a small sample or two reference examples as statistically representative. Include a `Data Availability` paragraph with the uploaded base archive SHA-256 from `UPSTREAM_MANIFEST.json`, benchmark source and the eventual public Git commit. The base repository was directly inspected in this version; the separate Sudoku reference repository was not fetched in this environment.
-
-## Local smoke results (NOT a speed benchmark)
-
-Environment: this file-authoring environment had no `python-sat` or `gurobipy`. The SAT workflows were run using the educational DPLL fallback, not CaDiCaL/Glucose. The two textbook instances have certified objective values `10` (Py 2024 example) and `9` (ICTAI example) across staircase and pairwise. Base CNF size:
-
-| Example | Encoding | Boolean variables | CNF clauses |
-|---|---|---:|---:|
-| Py 2024 (4 tasks) | pairwise | 43 | 254 |
-| Py 2024 (4 tasks) | staircase | 35 | 168 |
-| ICTAI 2024 (4 tasks) | pairwise | 44 | 277 |
-| ICTAI 2024 (4 tasks) | staircase | 36 | 173 |
-
-`experiments/smoke_comparison.csv` contains run-level fallback outputs for transparency; **do not include its timings as published SAT/Gurobi comparisons**.
+Report solved-to-optimal counts, shared-optima runtime comparisons, timeout rates
+and PAR-2 with a stated cutoff. Preserve unresolved runs and license failures.
+Total energy is schedule invariant; station_peak_sum is installed station capacity,
+not consumed energy. Existing CSVs and audit notes describe earlier code versions
+and cannot establish current solver performance. Regenerate them before reporting.
+The original benchmark files and UPSTREAM_MANIFEST.json remain provenance records;
+the manifest describes the uploaded original tree, not today's refactored sources.
