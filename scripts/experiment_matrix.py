@@ -233,7 +233,7 @@ def main(argv=None):
     )
     ap.add_argument("--objective", default=settings.get("objective", "peak"))
     ap.add_argument(
-        "--time-limit", type=float, default=settings.get("time_limit", 30.0)
+        "--time-limit", type=float, default=settings.get("time_limit", 3600.0)
     )
     ap.add_argument("--repeat", type=int, default=settings.get("repeat", 1))
     ap.add_argument("--out", default=settings.get("out", "experiments/results.csv"))
